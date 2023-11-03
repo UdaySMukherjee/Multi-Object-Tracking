@@ -9,7 +9,7 @@ To run this program, you need to have the following prerequisites installed:
 1. Java Development Kit (JDK)
 2. OpenCV library for Java
 
-You can download OpenCV for Java from the official OpenCV website: [OpenCV for Java](https://opencv.org/releases/).
+You can download OpenCV for Java from the official OpenCV website: [OpenCV for Java]([https://opencv.org/releases/](https://opencv.org/releases/)).
 
 ## Usage
 
