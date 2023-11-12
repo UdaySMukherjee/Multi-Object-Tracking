@@ -1,23 +1,14 @@
-//package sample;
+
 import org.opencv.core.*;
 import org.opencv.dnn.*;
 import org.opencv.utils.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
-import org.opencv.imgcodecs.Imgcodecs;
-import org.opencv.imgproc.Imgproc;
-import org.opencv.objdetect.CascadeClassifier;
 import org.opencv.videoio.VideoCapture;
-//import com.streambase.com.gs.collections.impl.Counter;
-
 import java.util.ArrayList;
 import java.util.List;
-
 import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferByte;
-import java.awt.image.WritableRaster;
 import java.io.ByteArrayInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -26,14 +17,53 @@ import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.data.xy.XYSeries;
+import org.jfree.data.xy.XYSeriesCollection;
+
 public class yolo {
 
-    private static List<String> getOutputNames(Net net) {
+    public static List<String> getOutputNames(Net net) {
         List<String> names = new ArrayList<>();
         List<Integer> outLayers = net.getUnconnectedOutLayers().toList();
         List<String> layersNames = net.getLayerNames();
         outLayers.forEach((item) -> names.add(layersNames.get(item - 1)));//unfold and create R-CNN layers from the loaded YOLO model//
         return names;
+    }
+    public static void plotConfidenceScores(List<Float> confs) {
+        XYSeries series = new XYSeries("Confidence Scores");
+
+        for (int i = 0; i < confs.size(); i++) {
+            series.add(i, confs.get(i));
+        }
+
+        XYSeriesCollection dataset = new XYSeriesCollection(series);
+        JFreeChart chart = ChartFactory.createXYLineChart(
+                "Confidence Scores",
+                "Object Index",
+                "Confidence",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true,
+                true,
+                false
+        );
+
+        XYPlot plot = chart.getXYPlot();
+        plot.setDomainPannable(true);
+        plot.setRangePannable(true);
+
+        ChartPanel chartPanel = new ChartPanel(chart);
+        JFrame chartFrame = new JFrame("Confidence Scores");
+        chartFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        chartFrame.getContentPane().add(chartPanel);
+        chartFrame.pack();
+        chartFrame.setLocationRelativeTo(null);
+        chartFrame.setVisible(true);
     }
     public static void main(String[] args) throws InterruptedException {
         System.load("C:\\Users\\pc\\Downloads\\opencv\\build\\java\\x64\\opencv_java480.dll"); // Load the openCV 4.0 dll //
@@ -43,7 +73,7 @@ public class yolo {
         VideoCapture cap = new VideoCapture(filePath);// Load video using the videocapture method//
         Mat frame = new Mat(); // define a matrix to extract and store pixel info from video//
         Mat dst = new Mat ();
-        //cap.read(frame);
+
         JFrame jframe = new JFrame("Video"); // the lines below create a frame to display the resultant video with object detection and localization//
         JLabel vidpanel = new JLabel();
         jframe.setContentPane(vidpanel);
@@ -58,6 +88,7 @@ public class yolo {
 
         List<Mat> result = new ArrayList<>();
         List<String> outBlobNames = getOutputNames(net);
+        List<Float> allConfidences = new ArrayList<>();
 
         while (true) {
 
@@ -65,8 +96,7 @@ public class yolo {
                 Mat blob = Dnn.blobFromImage(frame, 0.00392, sz, new Scalar(0), true, false); // We feed one frame of video into the network at a time, we have to convert the image to a blob. A blob is a pre-processed image that serves as the input.//
                 net.setInput(blob);
                 net.forward(result, outBlobNames); //Feed forward the model to get output //
-                // outBlobNames.forEach(System.out::println);
-                // result.forEach(System.out::println);
+
                 float confThreshold = 0.6f; //Insert thresholding beyond which the model will detect objects//
                 List<Integer> clsIds = new ArrayList<>();
                 List<Float> confs = new ArrayList<>();
@@ -99,8 +129,6 @@ public class yolo {
                     }
                 }
                 float nmsThresh = 0.5f;
-                //MatOfFloat confidences = new MatOfFloat(Converters.vector_float_to_Mat(confs));
-                //MatOfFloat confidences = new MatOfFloat(Converters.vector_float_to_Mat(confs));
 
                 MatOfFloat confidences = null; // Declare the variable outside of the if block
 
@@ -109,8 +137,7 @@ public class yolo {
                     Rect[] boxesArray = rects.toArray(new Rect[0]);
                     MatOfRect boxes = new MatOfRect(boxesArray);
                     MatOfInt indices = new MatOfInt();
-                    //Dnn.NMSBoxes(boxes, confidences, confThreshold, nmsThresh, indices); //We draw the bounding boxes for objects here//
-                    // Convert the Rect data to Rect2d
+
                     Rect2d[] boxesArray2d = new Rect2d[boxesArray.length];
                     for (int i = 0; i < boxesArray.length; i++) {
                         Rect rect = boxesArray[i];
@@ -127,62 +154,33 @@ public class yolo {
                         int idx = ind[i];
                         Rect box = boxesArray[idx];
                         Imgproc.rectangle(frame, box.tl(), box.br(), new Scalar(0,0,255), 2);
-                        //i=j;
 
+                        // Print confidence score
+                        float confidence = confidences.toArray()[idx];
+                        System.out.println("Confidence Score: " + confidence);
+                        // Accumulate confidence score
+
+                        allConfidences.add(confidence);
                         System.out.println(idx);
                     }
-                    // Imgcodecs.imwrite("D://out.png", image);
-                    //System.out.println("Image Loaded");
+
+
                     ImageIcon image = new ImageIcon(Mat2bufferedImage(frame)); //setting the results into a frame and initializing it //
                     vidpanel.setIcon(image);
                     vidpanel.repaint();
-                    // System.out.println(j);
-                    // System.out.println("Done");
-                    // Rest of your code
+
                 } else {
                     System.out.println("No valid confidence scores found.");
+                    plotConfidenceScores(allConfidences);
                 }
 
-
-//                Rect[] boxesArray = rects.toArray(new Rect[0]);
-//                MatOfRect boxes = new MatOfRect(boxesArray);
-//                MatOfInt indices = new MatOfInt();
-//                //Dnn.NMSBoxes(boxes, confidences, confThreshold, nmsThresh, indices); //We draw the bounding boxes for objects here//
-//                // Convert the Rect data to Rect2d
-//                Rect2d[] boxesArray2d = new Rect2d[boxesArray.length];
-//                for (int i = 0; i < boxesArray.length; i++) {
-//                    Rect rect = boxesArray[i];
-//                    boxesArray2d[i] = new Rect2d(rect.tl(), rect.br());
-//                }
-//
-//                MatOfRect2d boxes2d = new MatOfRect2d(boxesArray2d);
-//                Dnn.NMSBoxes(boxes2d, confidences, confThreshold, nmsThresh, indices);
-//
-//                int [] ind = indices.toArray();
-//                int j=0;
-//                for (int i = 0; i < ind.length; ++i)
-//                {
-//                    int idx = ind[i];
-//                    Rect box = boxesArray[idx];
-//                    Imgproc.rectangle(frame, box.tl(), box.br(), new Scalar(0,0,255), 2);
-//                    //i=j;
-//
-//                    System.out.println(idx);
-//                }
-//                // Imgcodecs.imwrite("D://out.png", image);
-//                //System.out.println("Image Loaded");
-//                ImageIcon image = new ImageIcon(Mat2bufferedImage(frame)); //setting the results into a frame and initializing it //
-//                vidpanel.setIcon(image);
-//                vidpanel.repaint();
-//                // System.out.println(j);
-//                // System.out.println("Done");
-
             }
+
         }
     }
 
     //	}
-    private static BufferedImage Mat2bufferedImage(Mat image) {   // The class described here  takes in matrix and renders the video to the frame  //
+    public static BufferedImage Mat2bufferedImage(Mat image) {   // The class described here  takes in matrix and renders the video to the frame  //
         MatOfByte bytemat = new MatOfByte();
         Imgcodecs.imencode(".jpg", image, bytemat);
         byte[] bytes = bytemat.toArray();
